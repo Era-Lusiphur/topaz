@@ -285,10 +285,16 @@ bool CMobEntity::CanLink(position_t* pos, int16 superLink)
         return false;
     }
 
+    // Don't link I'm an underground antlion
+    if ((m_roamFlags & ROAMFLAG_AMBUSH) && IsNameHidden())
+    {
+        return false;
+    }
+
     // link only if I see him
     if (m_Detects & DETECT_SIGHT) {
 
-        if (!isFaceing(loc.p, *pos, 40))
+        if (!facing(loc.p, *pos, 64))
         {
             return false;
         }
@@ -783,7 +789,7 @@ void CMobEntity::DistributeRewards()
             {
                 if (PMember->getZone() == PChar->getZone())
                 {
-                    roeutils::event(ROE_MOBKILL, (CCharEntity*)PChar, RoeDatagram("mob", (CMobEntity*)this));
+                    roeutils::event(ROE_MOBKILL, (CCharEntity*)PMember, RoeDatagram("mob", (CMobEntity*)this));
                 }
             });
 

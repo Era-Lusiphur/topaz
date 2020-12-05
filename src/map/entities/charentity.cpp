@@ -255,6 +255,10 @@ void CCharEntity::clearPacketList()
 
 void CCharEntity::pushPacket(CBasicPacket* packet)
 {
+    TracyZoneScoped;
+    TracyZoneIString(GetName());
+    TracyZoneHex16(packet->id());
+
     std::lock_guard<std::mutex> lk(m_PacketListMutex);
     PacketList.push_back(packet);
 }
@@ -486,36 +490,38 @@ bool CCharEntity::ReloadParty()
 void CCharEntity::RemoveTrust(CTrustEntity* PTrust)
 {
     if (!PTrust->PAI->IsSpawned())
+    {
         return;
+    }
 
-    auto trustIt = std::remove_if(PTrusts.begin(), PTrusts.end(), [PTrust](auto trust) { return PTrust == trust; });
+    auto trustIt = std::find_if(PTrusts.begin(), PTrusts.end(), [PTrust](auto trust) { return PTrust == trust; });
     if (trustIt != PTrusts.end())
     {
+        if (PTrust->animation == ANIMATION_DESPAWN)
+        {
+            luautils::OnMobDespawn(PTrust);
+        }
         PTrust->PAI->Despawn();
         PTrusts.erase(trustIt);
     }
-    if (PParty != nullptr)
-    {
-        PParty->ReloadParty();
-    }
+
+    ReloadPartyInc();
 }
 
 void CCharEntity::ClearTrusts()
 {
-    if (PTrusts.size() == 0)
+    for (auto PTrust : PTrusts)
     {
-        return;
-    }
-
-    for (auto trust : PTrusts)
-    {
-        trust->PAI->Despawn();
+        PTrust->PAI->Despawn();
     }
     PTrusts.clear();
+
+    ReloadPartyInc();
 }
 
 void CCharEntity::Tick(time_point tick)
 {
+    TracyZoneScoped;
     CBattleEntity::Tick(tick);
     if (m_DeathTimestamp > 0 && tick >= m_deathSyncTime)
     {
@@ -532,6 +538,7 @@ void CCharEntity::Tick(time_point tick)
 
 void CCharEntity::PostTick()
 {
+    TracyZoneScoped;
     CBattleEntity::PostTick();
     if (m_EquipSwap)
     {
@@ -676,7 +683,7 @@ bool CCharEntity::CanAttack(CBattleEntity* PTarget, std::unique_ptr<CBasicPacket
         PAI->Disengage();
         return false;
     }
-    else if (!isFaceing(this->loc.p, PTarget->loc.p, 40))
+    else if (!facing(this->loc.p, PTarget->loc.p, 64))
     {
         errMsg = std::make_unique<CMessageBasicPacket>(this, PTarget, 0, 0, MSGBASIC_UNABLE_TO_SEE_TARG);
         return false;
@@ -704,7 +711,7 @@ bool CCharEntity::OnAttack(CAttackState& state, action_t& action)
             for (auto&& PPotentialTarget : this->SpawnMOBList)
             {
                 if (PPotentialTarget.second->animation == ANIMATION_ATTACK &&
-                    isFaceing(this->loc.p, PPotentialTarget.second->loc.p, 64) &&
+                    facing(this->loc.p, PPotentialTarget.second->loc.p, 64) &&
                     distance(this->loc.p, PPotentialTarget.second->loc.p) <= 10)
                 {
                     std::unique_ptr<CBasicPacket> errMsg;
@@ -1690,6 +1697,8 @@ void CCharEntity::Die()
 
 void CCharEntity::Die(duration _duration)
 {
+    this->ClearTrusts();
+
     m_deathSyncTime = server_clock::now() + death_update_frequency;
     PAI->ClearStateStack();
     PAI->Internal_Die(_duration);
@@ -1738,6 +1747,23 @@ int32 CCharEntity::GetTimeRemainingUntilDeathHomepoint()
     return 0x0003A020 - (60 * GetSecondsElapsedSinceDeath());
 }
 
+
+int32 CCharEntity::GetTimeCreated()
+{
+    const char* fmtQuery = "SELECT UNIX_TIMESTAMP(timecreated) FROM chars WHERE charid = %u;";
+
+    int32 ret = Sql_Query(SqlHandle, fmtQuery, id);
+
+    if (ret != SQL_ERROR &&
+        Sql_NumRows(SqlHandle) != 0 &&
+        Sql_NextRow(SqlHandle) == SQL_SUCCESS)
+    {
+        return Sql_GetIntData(SqlHandle, 0);
+    }
+    
+    return 0;
+}
+
 bool CCharEntity::hasMoghancement(uint16 moghancementID)
 {
     return m_moghancementID == moghancementID;
@@ -1758,7 +1784,7 @@ void CCharEntity::UpdateMoghancement()
                 CItemFurnishing* PFurniture = static_cast<CItemFurnishing*>(PItem);
                 if (PFurniture->isInstalled())
                 {
-                    elements[PFurniture->getElement()] += PFurniture->getAura();
+                    elements[PFurniture->getElement() - 1] += PFurniture->getAura();
                 }
             }
         }
@@ -1768,9 +1794,9 @@ void CCharEntity::UpdateMoghancement()
     uint8 dominantElement = 0;
     uint16 dominantAura = 0;
     bool hasTiedElements = false;
-    for (uint8 elementID = 0; elementID < 8; ++elementID)
+    for (uint8 elementID = 1; elementID < 9; ++elementID)
     {
-        uint16 aura = elements[elementID];
+        uint16 aura = elements[elementID - 1];
         if (aura > dominantAura)
         {
             dominantElement = elementID;

@@ -1,4 +1,4 @@
--- This file is called by roe.lua and require()'s no file, it should not be require()'d by any 
+-- This file is called by roe.lua and require()'s no file, it should not be require()'d by any
 -- other lua scripts, which should instead require() roe.lua directly.
 
 local triggers = tpz.roe.triggers
@@ -17,12 +17,14 @@ local timedSchedule = {
     {     0,  4009,  4015,  4011,  4017,  4014}, -- Saturday
 }
 -- Load timetable for timed records
-RoeParseTimed(timedSchedule)
+if ENABLE_ROE_TIMED and ENABLE_ROE_TIMED > 0 then
+    RoeParseTimed(timedSchedule)
+end
 
 local defaults = {
     check = checks.masterCheck, -- Check function should return true/false
     increment = 1,              -- Amount to increment per successful check
-    notify = 1,                 -- Progress notifications shown every X increases 
+    notify = 1,                 -- Progress notifications shown every X increases
     goal = 1,                   -- Progress goal
     flags = {},                 -- Special flags. Possible values: "timed" "repeat" "daily"
     reqs = {},                  -- Other requirements. List of function names from above, with required values.
@@ -58,6 +60,55 @@ tpz.roe.records =
     [  11] = { -- Undertake a GoV Training Regime
         reward =  { sparks = 100, xp = 500}
     },
+
+    [ 932] = { -- Call Forth an Alter Ego (gives Cipher: Valaineral)
+        reward =  { sparks = 100, xp = 300, item = { 10116 } }
+    },
+
+    [ 933] = { -- Alter Ego: Valaineral (gives Cipher: Mihli)
+        reward =  { sparks = 100, xp = 300, item = { 10115 } }
+    },
+
+    [ 934] = { -- Alter Ego: Mihli Aliapoh (gives Cipher: Tenzen)
+        reward =  { sparks = 100, xp = 300, item = { 10114 } }
+    },
+
+    [ 935] = { -- Alter Ego: Tenzen (gives Cipher: Adelheid)
+        reward =  { sparks = 100, xp = 300, item = { 10153 } }
+    },
+
+    [ 936] = { -- Alter Ego: Adelheid (gives Cipher: Joachim)
+        reward =  { sparks = 100, xp = 300, item = { 10117 } }
+    },
+
+    [ 937] = { -- Alter Ego: Joachim
+        reward =  { sparks = 100, xp = 500 }
+    },
+
+  ----------------------------------------
+  -- Tutorial -> Intermediate           --
+  ----------------------------------------
+    --[[ TODO
+    [1045] = { -- Achieve Level 99 (gives Kupon A-PK109 x5)
+        reward =  { sparks = 200, xp = 300, item = { 8733, 5 } }
+    },
+
+    [1046] = { -- An Eminent Scholar (gives Kupon W-EMI)
+        reward =  { sparks = 200, xp = 200, item = { 9188 } }
+    },
+
+    [1047] = { -- An Eminent Scholar 2 (gives Kupon A-EMI)
+        reward =  { sparks = 200, xp = 200, item = { 9226 } }
+    },
+
+    [1048] = { -- An Eminent Scholar 3 (gives Kupon A-EMI)
+        reward =  { sparks = 200, xp = 200, item = { 9226 } }
+    },
+
+    [1049] = { -- Always Stand on 117 (gives Cipher: Koru-Moru)
+        reward =  { sparks = 200, xp = 300, item = { 10140 }  }
+    },
+    ]]
 
   --------------------------------------------
   -- Combat (Wide Area) -> Combat (General) --
@@ -849,7 +900,7 @@ tpz.roe.records =
     [ 237] = { -- Conflict: Ordelle's Caves
         trigger = triggers.mobKill,
         goal = 10,
-        reqs = { zone = set{102} },
+        reqs = { zone = set{193} },
         flags = set{"repeat"},
         reward = { sparks = 12, xp = 100, unity = 5, item = { 13470 } },
     },
@@ -1215,7 +1266,7 @@ tpz.roe.records =
     [ 288] = { -- Conflict: Castle Oztroja
         trigger = triggers.mobKill,
         goal = 10,
-        reqs = { zone = set{200} },
+        reqs = { zone = set{151} },
         flags = set{"repeat"},
         reward = { sparks = 13, xp = 650, unity = 5, item = { 13723 } },
     },
@@ -2105,7 +2156,7 @@ tpz.roe.records =
         goal = 20,
         reqs = { mobXP = true, mobSystem = set{tpz.eco.AQUAN} },
         flags = set{"timed", "repeat"},
-        reward = { sparks = 300, exp = 1500, unity = 300, item = { 8711 } },
+        reward = { sparks = 300, xp = 1500, unity = 300, item = { 8711 } },
     },
 
     [4009] = {   -- Vanquish Beasts
@@ -2113,7 +2164,7 @@ tpz.roe.records =
         goal = 20,
         reqs = { mobXP = true, mobSystem = set{tpz.eco.BEAST} },
         flags = set{"timed", "repeat"},
-        reward = { sparks = 300, exp = 1500, unity = 300, item = { 8711 } },
+        reward = { sparks = 300, xp = 1500, unity = 300, item = { 8711 } },
     },
 
     [4010] = {   -- Vanquish Plantoids
@@ -2121,7 +2172,7 @@ tpz.roe.records =
         goal = 20,
         reqs = { mobXP = true, mobSystem = set{tpz.eco.PLANTOID} },
         flags = set{"timed", "repeat"},
-        reward = { sparks = 300, exp = 1500, unity = 300, item = { 8711 } },
+        reward = { sparks = 300, xp = 1500, unity = 300, item = { 8711 } },
     },
 
     [4011] = {   -- Vanquish Lizards
@@ -2129,7 +2180,7 @@ tpz.roe.records =
         goal = 20,
         reqs = { mobXP = true, mobSystem = set{tpz.eco.LIZARD} },
         flags = set{"timed", "repeat"},
-        reward = { sparks = 300, exp = 1500, unity = 300, item = { 8711 } },
+        reward = { sparks = 300, xp = 1500, unity = 300, item = { 8711 } },
     },
 
     [4012] = {   -- Vanquish Vermin
@@ -2137,7 +2188,7 @@ tpz.roe.records =
         goal = 20,
         reqs = { mobXP = true, mobSystem = set{tpz.eco.VERMIN} },
         flags = set{"timed", "repeat"},
-        reward = { sparks = 300, exp = 1500, unity = 300, item = { 8711 } },
+        reward = { sparks = 300, xp = 1500, unity = 300, item = { 8711 } },
     },
 
     [4013] = { -- Gain Experience
@@ -2160,7 +2211,7 @@ tpz.roe.records =
         goal = 3,
         reqs = { itemID = set{1126, 1127, 2955, 2956, 2957} },
         flags = set{"timed", "repeat"},
-        reward = { sparks = 300, exp = 1500, unity = 300, item = { 8711 } },
+        reward = { sparks = 300, xp = 1500, unity = 300, item = { 8711 } },
     },
 
     [4015] = {   -- Vanquish Birds (TODO: No abyssea zone kills for vanquishes when exists)
@@ -2168,7 +2219,7 @@ tpz.roe.records =
         goal = 20,
         reqs = { mobXP = true, mobSystem = set{tpz.eco.BIRD} },
         flags = set{"timed", "repeat"},
-        reward = { sparks = 300, exp = 1500, unity = 300, item = { 8711 } },
+        reward = { sparks = 300, xp = 1500, unity = 300, item = { 8711 } },
     },
 
     [4016] = {   -- Vanquish Amorphs
@@ -2176,7 +2227,7 @@ tpz.roe.records =
         goal = 20,
         reqs = { mobXP = true, mobSystem = set{tpz.eco.AMORPH} },
         flags = set{"timed", "repeat"},
-        reward = { sparks = 300, exp = 1500, unity = 300, item = { 8711 } },
+        reward = { sparks = 300, xp = 1500, unity = 300, item = { 8711 } },
     },
 
     [4017] = {   -- Vanquish Undead
@@ -2184,7 +2235,7 @@ tpz.roe.records =
         goal = 20,
         reqs = { mobXP = true, mobSystem = set{tpz.eco.UNDEAD} },
         flags = set{"timed", "repeat"},
-        reward = { sparks = 300, exp = 1500, unity = 300, item = { 8711 } },
+        reward = { sparks = 300, xp = 1500, unity = 300, item = { 8711 } },
     },
 
     [4018] = {   -- Vanquish Arcana
@@ -2192,13 +2243,13 @@ tpz.roe.records =
         goal = 20,
         reqs = { mobXP = true, mobSystem = set{tpz.eco.ARCANA} },
         flags = set{"timed", "repeat"},
-        reward = { sparks = 300, exp = 1500, unity = 300, item = { 8711 } },
+        reward = { sparks = 300, xp = 1500, unity = 300, item = { 8711 } },
     },
 
     [4019] = {   -- Crack Treasure Caskets (Triggered from caskets.lua)
         goal = 10,
         flags = set{"timed", "repeat"},
-        reward = { sparks = 300, exp = 1500, unity = 300, item = { 8711 } },
+        reward = { sparks = 300, xp = 1500, unity = 300, item = { 8711 } },
     },
 
     -- [4020] = {  -- Physical Damage Kills

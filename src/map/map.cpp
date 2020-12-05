@@ -49,6 +49,7 @@ along with this program.  If not, see http://www.gnu.org/licenses/
 #include "packet_system.h"
 #include "party.h"
 #include "utils/petutils.h"
+#include "utils/trustutils.h"
 #include "roe.h"
 #include "spell.h"
 #include "time_server.h"
@@ -57,6 +58,7 @@ along with this program.  If not, see http://www.gnu.org/licenses/
 #include "status_effect_container.h"
 #include "utils/zoneutils.h"
 #include "conquest_system.h"
+#include "daily_system.h"
 #include "utils/mobutils.h"
 #include "ai/controllers/automaton_controller.h"
 
@@ -66,6 +68,20 @@ along with this program.  If not, see http://www.gnu.org/licenses/
 #include "packets/char_update.h"
 #include "message.h"
 
+#ifdef TRACY_ENABLE
+void* operator new(std::size_t count)
+{
+    auto ptr = malloc(count);
+    TracyAlloc(ptr, count);
+    return ptr;
+}
+
+void operator delete(void* ptr) noexcept
+{
+    TracyFree(ptr);
+    free(ptr);
+}
+#endif // TRACY_ENABLE
 
 const char* MAP_CONF_FILENAME = nullptr;
 
@@ -112,6 +128,7 @@ map_session_data_t* mapsession_getbyipp(uint64 ipp)
 
 map_session_data_t* mapsession_createsession(uint32 ip, uint16 port)
 {
+    TracyZoneScoped;
     map_session_data_t* map_session_data = new map_session_data_t;
     memset(map_session_data, 0, sizeof(map_session_data_t));
 
@@ -147,6 +164,7 @@ map_session_data_t* mapsession_createsession(uint32 ip, uint16 port)
 
 int32 do_init(int32 argc, char** argv)
 {
+    TracyZoneScoped;
     ShowStatus("do_init: begin server initialization...");
     map_ip.s_addr = 0;
 
@@ -229,7 +247,9 @@ int32 do_init(int32 argc, char** argv)
     battleutils::LoadMobSkillsList();
     battleutils::LoadSkillChainDamageModifiers();
     petutils::LoadPetList();
+    trustutils::LoadTrustList();
     mobutils::LoadCustomMods();
+    daily::LoadDailyItems();
     roeutils::init();
 
     ShowStatus("do_init: loading zones");
@@ -280,6 +300,7 @@ void do_final(int code)
     battleutils::FreeMobSkillList();
 
     petutils::FreePetList();
+    trustutils::FreeTrustList();
     zoneutils::FreeZoneList();
     luautils::free();
     message::close();
@@ -408,6 +429,9 @@ int32 do_sockets(fd_set* rfd, duration next)
             }
         }
     }
+
+    TracyReportLuaMemory(luautils::LuaHandle);
+
     return 0;
 }
 
@@ -570,12 +594,15 @@ int32 recv_parse(int8* buff, size_t* buffsize, sockaddr_in* from, map_session_da
 
 int32 parse(int8* buff, size_t* buffsize, sockaddr_in* from, map_session_data_t* map_session_data)
 {
+    TracyZoneScoped;
     // начало обработки входящего пакета
 
     int8* PacketData_Begin = &buff[FFXI_HEADER_SIZE];
     int8* PacketData_End = &buff[*buffsize];
 
-    CCharEntity *PChar = map_session_data->PChar;
+    CCharEntity* PChar = map_session_data->PChar;
+
+    TracyZoneIString(PChar->GetName());
 
     uint16 SmallPD_Size = 0;
     uint16 SmallPD_Type = 0;
@@ -624,7 +651,7 @@ int32 parse(int8* buff, size_t* buffsize, sockaddr_in* from, map_session_data_t*
             }
             else
             {
-                PacketParser[SmallPD_Type](map_session_data, PChar, CBasicPacket(reinterpret_cast<uint8*>(SmallPD_ptr)));
+                PacketParser[SmallPD_Type](map_session_data, PChar, std::move(CBasicPacket(reinterpret_cast<uint8*>(SmallPD_ptr))));
             }
         }
         else
@@ -820,6 +847,7 @@ int32 map_close_session(time_point tick, map_session_data_t* map_session_data)
 
 int32 map_cleanup(time_point tick, CTaskMgr::CTask* PTask)
 {
+    TracyZoneScoped;
     map_session_list_t::iterator it = map_session_list.begin();
 
     while (it != map_session_list.end())
@@ -877,7 +905,7 @@ int32 map_cleanup(time_point tick, CTaskMgr::CTask* PTask)
                         ShowDebug(CL_CYAN"map_cleanup: %s timed out, closing session\n" CL_RESET, PChar->GetName());
 
                         PChar->status = STATUS_SHUTDOWN;
-                        PacketParser[0x00D](map_session_data, PChar, 0);
+                        PacketParser[0x00D](map_session_data, PChar, std::move(CBasicPacket()));
                     }
                     else
                     {
@@ -1010,15 +1038,19 @@ int32 map_config_default()
     map_config.nm_hp_multiplier = 1.0f;
     map_config.mob_hp_multiplier = 1.0f;
     map_config.player_hp_multiplier = 1.0f;
+    map_config.alter_ego_hp_multiplier = 1.0f;
     map_config.nm_mp_multiplier = 1.0f;
     map_config.mob_mp_multiplier = 1.0f;
     map_config.player_mp_multiplier = 1.0f;
+    map_config.alter_ego_mp_multiplier = 1.0f;
     map_config.sj_mp_divisor = 2.0f;
     map_config.subjob_ratio = 1;
     map_config.include_mob_sj = false;
     map_config.nm_stat_multiplier = 1.0f;
     map_config.mob_stat_multiplier = 1.0f;
     map_config.player_stat_multiplier = 1.0f;
+    map_config.alter_ego_stat_multiplier = 1.0f;
+    map_config.alter_ego_skill_multiplier = 1.0f;
     map_config.ability_recast_multiplier = 1.0f;
     map_config.blood_pact_shared_timer = 0;
     map_config.vanadiel_time_epoch = 0;
@@ -1048,6 +1080,8 @@ int32 map_config_default()
     map_config.skillup_bloodpact = true;
     map_config.anticheat_enabled = false;
     map_config.anticheat_jail_disable = false;
+    map_config.daily_tally_amount = 10;
+    map_config.daily_tally_limit = 50000;
     return 0;
 }
 
@@ -1197,6 +1231,10 @@ int32 map_config_read(const int8* cfgName)
         {
             map_config.player_hp_multiplier = (float)atof(w2);
         }
+        else if (strcmp(w1, "alter_ego_hp_multiplier") == 0)
+        {
+            map_config.alter_ego_hp_multiplier = (float)atof(w2);
+        }
         else if (strcmp(w1, "nm_mp_multiplier") == 0)
         {
             map_config.nm_mp_multiplier = (float)atof(w2);
@@ -1208,6 +1246,10 @@ int32 map_config_read(const int8* cfgName)
         else if (strcmp(w1, "player_mp_multiplier") == 0)
         {
             map_config.player_mp_multiplier = (float)atof(w2);
+        }
+        else if (strcmp(w1, "alter_ego_mp_multiplier") == 0)
+        {
+            map_config.alter_ego_mp_multiplier = (float)atof(w2);
         }
         else if (strcmp(w1, "sj_mp_divisor") == 0)
         {
@@ -1232,6 +1274,14 @@ int32 map_config_read(const int8* cfgName)
         else if (strcmp(w1, "player_stat_multiplier") == 0)
         {
             map_config.player_stat_multiplier = (float)atof(w2);
+        }
+        else if (strcmp(w1, "alter_ego_stat_multiplier") == 0)
+        {
+            map_config.alter_ego_stat_multiplier = (float)atof(w2);
+        }
+        else if (strcmp(w1, "alter_ego_skill_multiplier") == 0)
+        {
+            map_config.alter_ego_skill_multiplier = (float)atof(w2);
         }
         else if (strcmp(w1, "ability_recast_multiplier") == 0)
         {
@@ -1433,6 +1483,14 @@ int32 map_config_read(const int8* cfgName)
         {
             map_config.anticheat_jail_disable = atoi(w2);
         }
+        else if (strcmp(w1, "daily_tally_amount") == 0)
+        {
+            map_config.daily_tally_amount = atoi(w2);
+        }
+        else if (strcmp(w1, "daily_tally_limit") == 0)
+        {
+            map_config.daily_tally_limit = atoi(w2);
+        }
         else
         {
             ShowWarning(CL_YELLOW"Unknown setting '%s' in file %s\n" CL_RESET, w1, cfgName);
@@ -1468,6 +1526,7 @@ int32 map_config_read(const int8* cfgName)
 
 int32 map_garbage_collect(time_point tick, CTaskMgr::CTask* PTask)
 {
+    TracyZoneScoped;
     luautils::garbageCollect();
     return 0;
 }

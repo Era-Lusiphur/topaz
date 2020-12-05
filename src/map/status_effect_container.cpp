@@ -1035,12 +1035,18 @@ void CStatusEffectContainer::Fold(uint32 charid)
                 {
                     oldestRoll = PStatusEffect;
                 }
-                else if (oldestRoll->GetStatusID() != EFFECT_BUST && PStatusEffect->GetStatusID() == EFFECT_BUST)
+                else if (PStatusEffect->GetStatusID() == EFFECT_BUST)
                 {
-                    oldestRoll = PStatusEffect;
+                    if (oldestRoll->GetStatusID() == EFFECT_BUST)
+                    {
+                        oldestRoll = PStatusEffect->GetStartTime() > oldestRoll->GetStartTime() ? PStatusEffect : oldestRoll;
+                    }
+                    else
+                    {
+                        oldestRoll = PStatusEffect;
+                    }
                 }
-                else if (std::chrono::milliseconds(PStatusEffect->GetDuration()) + PStatusEffect->GetStartTime() <
-                    std::chrono::milliseconds(oldestRoll->GetDuration()) + oldestRoll->GetStartTime())
+                else if (oldestRoll->GetStatusID() != EFFECT_BUST && PStatusEffect->GetStartTime() > oldestRoll->GetStartTime())
                 {
                     oldestRoll = PStatusEffect;
                 }
@@ -1049,7 +1055,7 @@ void CStatusEffectContainer::Fold(uint32 charid)
     }
     if (oldestRoll != nullptr)
     {
-        DelStatusEffectSilent(oldestRoll->GetStatusID());
+        RemoveStatusEffect(oldestRoll);
         DelStatusEffectSilent(EFFECT_DOUBLE_UP_CHANCE);
     }
 }
@@ -1293,11 +1299,14 @@ void CStatusEffectContainer::SetEffectParams(CStatusEffect* StatusEffect)
     if (m_POwner->isAlive())
     {
         // this should actually go into a char charm AI
-        if (m_POwner->PPet != nullptr && m_POwner->objtype == TYPE_PC)
+        if (m_POwner->objtype == TYPE_PC)
         {
             if (effect == EFFECT_CHARM || effect == EFFECT_CHARM_II)
             {
-                petutils::DespawnPet(m_POwner);
+                if (m_POwner->PPet != nullptr)
+                {
+                    petutils::DespawnPet(m_POwner);
+                }
             }
         }
 
@@ -1489,6 +1498,7 @@ void CStatusEffectContainer::SaveStatusEffects(bool logout)
 void CStatusEffectContainer::CheckEffectsExpiry(time_point tick)
 {
     TPZ_DEBUG_BREAK_IF(m_POwner == nullptr);
+    TracyZoneScoped;
 
     for (CStatusEffect* PStatusEffect : m_StatusEffectSet)
     {
@@ -1509,6 +1519,7 @@ void CStatusEffectContainer::CheckEffectsExpiry(time_point tick)
 
 void CStatusEffectContainer::HandleAura(CStatusEffect* PStatusEffect)
 {
+    TracyZoneScoped;
     CBattleEntity* PEntity = static_cast<CBattleEntity*>(m_POwner);
     AURATARGET auraTarget = static_cast<AURATARGET>(PStatusEffect->GetTier());
 
@@ -1566,6 +1577,7 @@ void CStatusEffectContainer::HandleAura(CStatusEffect* PStatusEffect)
 
 void CStatusEffectContainer::TickEffects(time_point tick)
 {
+    TracyZoneScoped;
     TPZ_DEBUG_BREAK_IF(m_POwner == nullptr);
 
     if (!m_POwner->isDead())
@@ -1596,6 +1608,7 @@ void CStatusEffectContainer::TickEffects(time_point tick)
 
 void CStatusEffectContainer::TickRegen(time_point tick)
 {
+    TracyZoneScoped;
     TPZ_DEBUG_BREAK_IF(m_POwner == nullptr);
 
     if (!m_POwner->isDead())
@@ -1733,9 +1746,11 @@ bool CStatusEffectContainer::CheckForElevenRoll()
 
 bool CStatusEffectContainer::IsAsleep()
 {
-    return HasStatusEffect({EFFECT_SLEEP,
+    return HasStatusEffect({
+        EFFECT_SLEEP,
         EFFECT_SLEEP_II,
-        EFFECT_LULLABY});
+        EFFECT_LULLABY
+    });
 }
 
 void CStatusEffectContainer::WakeUp()

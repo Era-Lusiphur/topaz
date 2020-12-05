@@ -449,6 +449,22 @@ void CZone::InsertPET(CBaseEntity* PPet)
 
 /************************************************************************
 *                                                                       *
+*  Add a trust to the zone                                              *
+*                                                                       *
+************************************************************************/
+
+void CZone::InsertTRUST(CBaseEntity* PTrust)
+{
+    m_zoneEntities->InsertTRUST(PTrust);
+}
+
+void CZone::DeleteTRUST(CBaseEntity* PTrust)
+{
+    m_zoneEntities->DeleteTRUST(PTrust);
+}
+
+/************************************************************************
+*                                                                       *
 *  Добавляем в зону активную область                                    *
 *                                                                       *
 ************************************************************************/
@@ -612,6 +628,7 @@ void CZone::DecreaseZoneCounter(CCharEntity* PChar)
 
 void CZone::IncreaseZoneCounter(CCharEntity* PChar)
 {
+    TracyZoneScoped;
     TPZ_DEBUG_BREAK_IF(PChar == nullptr);
     TPZ_DEBUG_BREAK_IF(PChar->loc.zone != nullptr);
     TPZ_DEBUG_BREAK_IF(PChar->PTreasurePool != nullptr);
@@ -658,6 +675,11 @@ void CZone::SpawnMOBs(CCharEntity* PChar)
 void CZone::SpawnPETs(CCharEntity* PChar)
 {
     m_zoneEntities->SpawnPETs(PChar);
+}
+
+void CZone::SpawnTRUSTs(CCharEntity* PChar)
+{
+    m_zoneEntities->SpawnTRUSTs(PChar);
 }
 
 /************************************************************************
@@ -823,6 +845,22 @@ void CZone::ForEachMobInstance(CBaseEntity* PEntity, std::function<void(CMobEnti
     }
 }
 
+void CZone::ForEachTrust(std::function<void(CTrustEntity*)> func)
+{
+    for (auto PTrust : m_zoneEntities->m_trustList)
+    {
+        func((CTrustEntity*)PTrust.second);
+    }
+}
+
+void CZone::ForEachTrustInstance(CBaseEntity* PEntity, std::function<void(CTrustEntity*)> func)
+{
+    for (auto PTrust : m_zoneEntities->m_trustList)
+    {
+        func((CTrustEntity*)PTrust.second);
+    }
+}
+
 void CZone::ForEachNpc(std::function<void(CNpcEntity*)> func)
 {
     for (auto PNpc : m_zoneEntities->m_npcList)
@@ -844,6 +882,7 @@ void CZone::createZoneTimer()
 
 void CZone::CharZoneIn(CCharEntity* PChar)
 {
+    TracyZoneScoped;
     // ищем свободный targid для входящего в зону персонажа
 
     PChar->loc.zone = this;
@@ -898,6 +937,7 @@ void CZone::CharZoneIn(CCharEntity* PChar)
 
 void CZone::CharZoneOut(CCharEntity* PChar)
 {
+    TracyZoneScoped;
     for (regionList_t::const_iterator region = m_regionList.begin(); region != m_regionList.end(); ++region)
     {
         if ((*region)->GetRegionID() == PChar->m_InsideRegionID)
@@ -970,6 +1010,7 @@ void CZone::CharZoneOut(CCharEntity* PChar)
     PChar->SpawnNPCList.clear();
     PChar->SpawnMOBList.clear();
     PChar->SpawnPETList.clear();
+    PChar->SpawnTRUSTList.clear();
 
     if (PChar->PParty && PChar->loc.destination != 0 && PChar->m_moghouseID == 0)
     {
@@ -991,6 +1032,7 @@ void CZone::CharZoneOut(CCharEntity* PChar)
 
 void CZone::CheckRegions(CCharEntity* PChar)
 {
+    TracyZoneScoped;
     uint32 RegionID = 0;
 
     for (regionList_t::const_iterator region = m_regionList.begin(); region != m_regionList.end(); ++region)
